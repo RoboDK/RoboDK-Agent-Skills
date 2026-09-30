@@ -20,6 +20,19 @@ RoboDK Agent Skills teach AI agents such as Claude Code how to work with
 🚧 **Coming soon.** The skills are in final review and will be published here shortly.
 Star or watch this repository to be notified when they are released.
 
+## Learn more
+
+- 🌐 [RoboDK](https://robodk.com): simulation and offline programming for industrial robots
+- 📖 [Documentation](https://robodk.com/doc/en/): the RoboDK user guide
+- 🐍 [RoboDK API](https://robodk.com/doc/en/RoboDK-API.html): program RoboDK from Python, C#, C++, and more
+- 💬 [Forum](https://robodk.com/forum/): questions and discussion with the RoboDK community
+- 🔔 [LinkedIn](https://www.linkedin.com/company/robodk/): follow RoboDK for the launch announcement
+
+## Security
+
+Found a security issue? Please report it privately to info@robodk.com. See [SECURITY.md](SECURITY.md).
+Real-robot use is covered there too: these skills are productivity tools, not safety systems.
+
 ## License
 
 [MIT](LICENSE) © RoboDK Global
