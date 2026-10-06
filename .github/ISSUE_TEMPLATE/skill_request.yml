@@ -1,0 +1,40 @@
+name: New skill or improvement
+description: Suggest a new skill, or a capability an existing skill should cover.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: task
+    attributes:
+      label: What RoboDK task should an agent be able to do?
+      description: Describe it as you would ask an agent to do it.
+      placeholder: |
+        I want to ask the agent to ... and have it ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What happens today?
+      description: Does an existing skill nearly cover it, or is there no skill for this at all?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Is this a new skill or a change to an existing one?
+      options:
+        - A new skill
+        - An improvement to an existing skill
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: knowledge
+    attributes:
+      label: Reference material
+      description: >
+        Controller manuals, RoboDK documentation pages, or working code that would help write
+        this. Please don't paste material you don't have the right to share.

@@ -1,0 +1,348 @@
+# Copyright 2015-2024 - RoboDK Inc. - https://robodk.com/
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# --------------------------------------------
+# --------------- DESCRIPTION ----------------
+"""This module defines general utility functions for Robolink and Items.
+These functions facilitate the usage of some RoboDK API functions 
+and create RoboDK add-ins.
+
+More information about the RoboDK API for Python and RoboDK Add-ins here:
+
+* https://robodk.com/doc/en/RoboDK-API.html
+* https://robodk.com/doc/en/PythonAPI/robodk.html#robolinkutils-py
+* https://robodk.com/doc/en/Add-ins.html
+"""
+# --------------------------------------------
+import sys
+from robodk import robolink, robomath
+
+if sys.version_info.major >= 3 and sys.version_info.minor >= 5:
+    # Python 3.5+ type hints. Type hints are stripped for <3.5
+    from typing import List, Union, Any, Tuple
+
+
+def getLinks(item: robolink.Item, type_linked: int = robolink.ITEM_TYPE_ROBOT) -> List[robolink.Item]:
+    """
+    Get all the items of a specific type for which getLink() returns the specified item.
+
+    :param item: The source Item
+    :type item: :class:`.Item`
+    :param type_linked: type of items to check for a link. None means any type.
+    :type type_linked: int
+
+    :return: A list of Items for which item.getLink return the specified item
+    :rtype: list of :class:`.Item`
+    """
+    item_type = item.Type()
+    links = []
+    for candidate in item.RDK().ItemList(type_linked):
+        if candidate == item:
+            continue
+
+        link = candidate.getLink(type_linked=item_type)
+        if link.Valid() and link == item:
+            links.append(candidate)
+    return links
+
+
+def getAncestors(item: robolink.Item, parent_types: List[int] = None) -> List[robolink.Item]:
+    """
+    Get the list of parents of an Item up to the Station, with type filtering (i.e. [ITEM_TYPE_FRAME, ITEM_TYPE_ROBOT, ..]).
+    By default, it will return all parents of an Item with no regard to their type, ordered from the Item's parent to the Station.
+
+    :param item: The source Item
+    :type item: :class:`.Item`
+    :param parent_types: The parent allowed types, such as ITEM_TYPE_FRAME, defaults to None
+    :type parent_types: list of ITEM_TYPE_*, optional
+
+    :return: A list of parents, ordered from the Item's parent to the Station.
+    :rtype: list of :class:`.Item`
+    """
+
+    if parent_types and type(parent_types) is not list:
+        parent_types = [parent_types]
+
+    parent = item
+    parents = []
+    while (parent is not None and parent.Type() not in [robolink.ITEM_TYPE_STATION, -1]):
+        parent = parent.Parent()
+
+        if parent_types is None:
+            parents.append(parent)
+            continue
+
+        for parent_type in parent_types:
+            if parent.Type() == parent_type:
+                parents.append(parent)
+                break
+
+    return parents
+
+
+def getLowestCommonAncestor(item1: robolink.Item, item2: robolink.Item) -> robolink.Item:
+    """
+    Finds the lowest common ancestor (LCA) between two Items in the Station's tree.
+
+    :param item1: The first Item
+    :type item1: :class:`.Item`
+    :param item2: The second Item
+    :type item2: :class:`.Item`
+
+    :return: The lowest common ancestor (LCA)
+    :rtype: :class:`.Item`
+    """
+
+    # Make an ordered list of parents. Iter on it until the parent differs.. and you get the lowest common ancestor (LCA)
+    parents1 = getAncestors(item1)
+    parents2 = getAncestors(item2)
+
+    lca = None
+    size = min(len(parents1), len(parents2))
+    for i in range(size):
+        if parents1[-1] != parents2[-1]:
+            break
+
+        lca = parents1[-1]
+        parents1.pop()
+        parents2.pop()
+
+    return lca
+
+
+def getAncestorPose(item_child: robolink.Item, item_parent: robolink.Item) -> robomath.Mat:
+    """
+    Gets the pose between two Items that have a hierarchical relationship in the Station's tree.
+    There can be N Items between the two.
+    This function will throw an error for synchronized axis.
+
+    :param item_child: The child Item
+    :type item_child: :class:`.Item`
+    :param item_parent: The parent Item
+    :type item_parent: :class:`.Item`
+
+    :return: The pose from the child to the parent
+    :rtype: :class:`robomath.Mat`
+    """
+
+    if item_child == item_parent:
+        return robomath.eye(4)
+
+    parents = getAncestors(item_child)
+    if item_parent not in parents:
+        return None
+
+    items = [item_child] + parents
+    idx = items.index(item_parent)
+    poses = []
+    for i in range(idx - 1, -1, -1):
+        if items[i].Type() in [robolink.ITEM_TYPE_TOOL]:
+            poses.append(items[i].PoseTool())
+
+        elif items[i].Type() in [robolink.ITEM_TYPE_ROBOT]:
+            if items[i].getLink(robolink.ITEM_TYPE_ROBOT) != items[i]:
+                continue
+
+            axes_links = getLinks(items[i], robolink.ITEM_TYPE_ROBOT_AXES)
+            if axes_links:
+                raise robolink.InputError("This function does not support synchronized axis")
+
+            joints = items[i].Joints().list()
+            poses.append(items[i].SolveFK(joints))
+
+        else:
+            poses.append(items[i].Pose())
+
+    pose_wrt = robomath.eye(4)
+    for pose in poses:  # this format is to ease debugging
+        pose_wrt *= pose
+    return pose_wrt
+
+
+def getPoseWrt(item1: robolink.Item, item2: robolink.Item) -> robomath.Mat:
+    """
+    Gets the pose of an Item (item1) with respect to an another Item (item2).
+
+    .. code-block:: python
+
+        child.PoseWrt(child.Parent())  # will return a forward pose from the parent to the child
+        child.Parent().PoseWrt(child)  # will return an inverse pose from the child to the parent
+        tool.PoseWrt(tool.Parent())  # will return the PoseTool() of the tool
+        tool.PoseWrt(station)  # will return the absolute pose of the tool
+
+    :param item1: The source Item
+    :type item1: :class:`robolink.Item`
+    :param item2: The second Item
+    :type item2: :class:`robolink.Item`
+
+    :return: The pose from the source Item to the second Item
+    :rtype: :class:`robomath.Mat`
+    """
+
+    if item1 == item2:
+        return robomath.eye(4)
+
+    pose1 = item1.PoseAbs()
+    pose2 = item2.PoseAbs()
+
+    if item1.Type() in [robolink.ITEM_TYPE_ROBOT, robolink.ITEM_TYPE_TOOL]:
+        pose1 = getAncestorPose(item1, item1.RDK().ActiveStation())
+
+    if item2.Type() in [robolink.ITEM_TYPE_ROBOT, robolink.ITEM_TYPE_TOOL]:
+        pose2 = getAncestorPose(item2, item2.RDK().ActiveStation())
+
+    return pose2.inv() * pose1
+
+
+def setPoseAbsIK(item: robolink.Item, pose_abs: robomath.Mat):
+    """
+    Set the pose of the item with respect to the absolute reference frame, accounting for inverse kinematics.
+    For instance, you can set the absolute pose of a ITEM_TYPE_TOOL directly without accounting for the robot kinematics.
+    This function will throw an error for synchronized axis.
+
+    .. code-block:: python
+
+        tool_item.setPoseAbs(eye(4))  # will SET the tool center point with respect to the station at [0,0,0,0,0,0]
+        setPoseAbsIK(tool_item, eye(4))  # will MOVE the robot so that the tool center point with regard to the station is [0,0,0,0,0,0]
+
+    :param item: The source Item
+    :type item: :class:`robolink.Item`
+    :param pose_abs: pose of the item with respect to the station reference
+    :type pose_abs: :class:`robomath.Mat`
+    """
+    if item.Type() == robolink.ITEM_TYPE_STATION:
+        return
+
+    parents = getAncestors(item)
+    if len(parents) == 1:
+        item.setPose(pose_abs)
+        return
+
+    if item.Type() in [robolink.ITEM_TYPE_TOOL]:
+        # Tool Item is not necessarily the active tool
+        pose_abs = pose_abs * item.PoseTool().inv() * item.Parent().PoseTool()
+        item = item.Parent()
+        parents.pop(0)
+
+    parent_pose_abs = getAncestorPose(parents[0], item.RDK().ActiveStation())
+    pose = parent_pose_abs.inv() * pose_abs
+
+    if item.Type() == robolink.ITEM_TYPE_ROBOT:
+        joints = item.SolveIK(pose, tool=item.PoseTool()).list()
+        if len(joints) != len(item.Joints().list()):
+            raise robolink.TargetReachError("No solution found for the desired pose.")
+        item.setJoints(joints)
+    else:
+        item.setPose(pose)
+
+
+def SolveIK_Conf(robot: robolink.Item, pose: robomath.Mat, toolpose: robomath.Mat = None, framepose: robomath.Mat = None, joint_config: List[int] = [0, 1, 0]) -> List[robomath.Mat]:
+    """Calculates the inverse kinematics for the specified robot and pose. The function returns only the preferred solutions from the joint configuration as a 2D matrix.
+    Returns a list of joints as a 2D matrix [N x M], where N is the number of degrees of freedom (robot joints) and M is the number of solutions. For some 6-axis robots, SolveIK returns 2 additional values that can be ignored.
+
+    :param robot: The robot Item
+    :type robot: :class:`robolink.Item`
+    :param pose: pose of the robot flange with respect to the robot base frame
+    :type pose: :class:`~robodk.robomath.Mat`
+    :param toolpose: Tool pose with respect to the robot flange (TCP)
+    :type toolpose: :class:`~robodk.robomath.Mat`
+    :param framepose: Reference pose (reference frame with respect to the robot base)
+    :type framepose: :class:`~robodk.robomath.Mat`
+    :param joint_config: desired joint configuration, as [Front(0)/Rear(1)/Any(-1), Elbow Up(0)/Elbow Down(1)/Any(-1), Non-flip(0)/Flip(1)/Any(-1)]
+    :type joint_config: list of int
+    """
+
+    desired_rear, desired_lower, desired_flip = joint_config[:3]
+    joint_solutions = []
+
+    for joint_solution in robot.SolveIK_All(pose, toolpose, framepose):
+        rear, lower, flip = [int(x) for x in robot.JointsConfig(joint_solution).list()[:3]]
+        if desired_rear < 0 or rear == desired_rear:
+            if desired_lower < 0 or lower == desired_lower:
+                if desired_flip < 0 or flip == desired_flip:
+                    joint_solutions.append(joint_solution)
+
+    return joint_solutions
+
+
+def addFile(RDK: robolink.Robolink, filepath: str, parent: robolink.Item = None) -> robolink.Item:
+    """
+    Add a file to the station and return the newly added :class:`.Item`, working around two RoboDK quirks:
+
+    - Loading a .tool file with no robot parent triggers an interactive robot-selection prompt. If a robot
+      exists in the station, this function attaches the tool to the first available robot before
+      re-parenting it to the requested parent, avoiding the prompt.
+    - :func:`~robodk.robolink.Robolink.AddFile` leaves the new Item with a non-identity pose offset; this
+      function resets it to identity so the Item ends up at its parent's origin.
+
+    :param RDK: The Robolink connection
+    :type RDK: :class:`robolink.Robolink`
+    :param filepath: file to load, as supported by :func:`~robodk.robolink.Robolink.AddFile`
+    :type filepath: str
+    :param parent: item to attach the newly loaded item to (defaults to the active station)
+    :type parent: :class:`.Item`, optional
+
+    :return: The newly added Item
+    :rtype: :class:`.Item`
+    """
+    if parent is None:
+        parent = RDK.ActiveStation()
+
+    if filepath.lower().endswith(".tool") and parent.Type() != robolink.ITEM_TYPE_ROBOT:
+        robots = RDK.ItemList(robolink.ITEM_TYPE_ROBOT)
+        if robots:
+            item = RDK.AddFile(filepath, robots[0])  # Avoids the robot-selection prompt
+            item.setParent(parent)
+        else:
+            item = RDK.AddFile(filepath, parent)
+    else:
+        item = RDK.AddFile(filepath, parent)
+
+    if not item.Valid():
+        raise robolink.InputError("Failed to load file: %s" % filepath)
+
+    if item.Type() == robolink.ITEM_TYPE_ROBOT:
+        # Importing a robot also creates a base Frame that duplicates the requested parent.
+        auto_frame = item.Parent()
+        item.setParent(parent)
+        if auto_frame.Type() == robolink.ITEM_TYPE_FRAME:
+            auto_frame.Delete()
+
+    item.setPose(robomath.eye(4))  # AddFile() adds a pose offset; reset it to the parent's origin
+    return item
+
+
+def getItemParam(item: robolink.Item, param: str) -> Union[str, dict, None]:
+    """
+    Get a station/item parameter or command result via :func:`~robodk.robolink.Item.setParam` used as a
+    query (no value provided), normalizing RoboDK's "no value" responses (an empty dict, an empty string,
+    or an ``(ItemCommand)``/``illegal value`` error string) into ``None``.
+
+    Note: this is unrelated to :func:`~robodk.robolink.Item.getParam`, which retrieves custom binary data
+    previously stored with ``item.setParam(name, bytes)``.
+
+    :param item: The source Item
+    :type item: :class:`.Item`
+    :param param: Parameter/command name, as documented for :func:`~robodk.robolink.Item.setParam`
+    :type param: str
+
+    :return: The parameter value, or None if the parameter does not exist or has no value
+    """
+    value = item.setParam(param)
+    if isinstance(value, dict) and not value:
+        return None
+    if isinstance(value, str) and (not value or value.startswith("(ItemCommand)") or value.startswith("illegal value")):
+        return None
+    return value
+
+
+if __name__ == "__main__":
+    pass

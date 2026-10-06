@@ -1,0 +1,94 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  manifest.xml template for a RoboDK Add-in (App).
+
+  This is the modern, single-file form: coreProperties (package identity) is
+  embedded directly inside packageManifest instead of living in a separate
+  core_properties.xml. RoboDK's loader accepts either layout for an unpacked
+  (development) Add-in folder, so during development you only need to
+  maintain this one file. The packaged .rdkp still ships two separate OPC
+  parts either way -- `robodk_addin.py sync`/`package` split this back out
+  automatically, along with _rels/.rels and [Content_Types].xml.
+
+  See references/packaging.md for the full field reference and
+  references/appconfig.md for AppConfig.ini, which this manifest points at
+  via the AppConfig asset below.
+
+  Replace every ALL_CAPS placeholder. Delete the <dependencies> block and the
+  commented-out per-platform <asset> lines if you don't need them -- an
+  Add-in with an empty <dependencies> and every asset cpu="any" system="any"
+  is the common case, not a shortcut.
+-->
+<packageManifest xmlns="http://schemas.robodk.com/package/2022/manifest" version="1.0"
+                  xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+                  xmlns:dc="http://purl.org/dc/elements/1.1/"
+                  xmlns:dcterms="http://purl.org/dc/terms/"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <!-- Package identity (Dublin Core / OPC core properties) -->
+  <cp:coreProperties>
+    <cp:category>Application</cp:category> <!-- Application | Plugin | PostProcessor | RobotDriver | Library -->
+    <dc:identifier>com.YOURCOMPANY.app.YOURAPPNAME</dc:identifier> <!-- reverse-domain, unique, lowercase; never change once published -->
+    <dc:title>YOUR APP DISPLAY NAME</dc:title>
+    <cp:version>1.0.0</cp:version> <!-- major.minor.patch; keep in step with Version= in AppConfig.ini -->
+    <cp:revision>1</cp:revision> <!-- bump when you repackage the same version -->
+    <dc:description>One-line description of what this Add-in does.</dc:description>
+    <dc:creator>Your Name</dc:creator>
+    <cp:lastModifiedBy>Your Name</cp:lastModifiedBy>
+    <dc:language>eng</dc:language>
+    <cp:keywords>keyword1, keyword2</cp:keywords>
+    <cp:contentStatus>Final</cp:contentStatus>
+    <dcterms:created xsi:type="dcterms:W3CDTF">2024-01-01T00:00:00.000000Z</dcterms:created>
+    <dcterms:modified xsi:type="dcterms:W3CDTF">2024-01-01T00:00:00.000000Z</dcterms:modified>
+  </cp:coreProperties>
+
+  <!-- RoboDK-specific extras shown in the Add-in Manager -->
+  <extraProperties>
+    <website>https://example.com/</website>
+    <documentation>https://example.com/docs</documentation>
+    <repository>https://github.com/you/your-app</repository>
+    <company>Your Company</company>
+    <email>support@example.com</email>
+    <icon>/icon.svg</icon> <!-- package-root-relative: a sibling of the App folder in the built .rdkp, not inside it -->
+  </extraProperties>
+
+  <!--
+    Optional: gate install on an exact RoboDK/Qt version, OS, CPU architecture,
+    or a file's presence/version/timestamp. Delete this whole block if you
+    don't need it -- most published Apps do. See packaging.md#dependencies
+    for every `type`/attribute combination.
+  -->
+  <!--
+  <dependencies>
+    <dependency type="versioncheck" scope="package" identifier="com.robodk"
+                version="5.6.0" displayName="Requires RoboDK 5.6.0"/>
+    <dependency type="system" scope="asset" value="windows"
+                displayName="Windows-only helper"/>
+  </dependencies>
+  -->
+
+  <!--
+    Installed files: one <asset> per file actually shipped, path prefixed
+    with the App folder name. `robodk_addin.py sync` keeps this list in step
+    with disk -- hand-edit only if you are not using that tool.
+  -->
+  <assets>
+    <asset cpu="any" system="any" target="$(SourcePath)">/YourAppFolder/AppConfig.ini</asset>
+    <asset cpu="any" system="any" target="$(SourcePath)">/YourAppFolder/YourAction.py</asset>
+    <asset cpu="any" system="any" target="$(SourcePath)">/YourAppFolder/YourAction.svg</asset>
+    <asset cpu="any" system="any" target="$(SourcePath)">/YourAppFolder/requirements.txt</asset>
+    <asset cpu="any" system="any" target="$(SourcePath)">/YourAppFolder/README.md</asset>
+
+    <!--
+      Per-platform binary example -- a compiled helper .exe, a vendored
+      .dll/.so/.dylib a script loads via ctypes, or a native RoboDK Plugin.
+      One <asset> per platform; the loadable one per cpu/system pair is
+      marked type="entrypoint" so RoboDK knows which file to load.
+    -->
+    <!--
+    <asset cpu="x86_64" system="windows" type="entrypoint" target="$(SourcePath)">/YourAppFolder/helper.dll</asset>
+    <asset cpu="x86_64" system="linux" type="entrypoint" target="$(SourcePath)">/YourAppFolder/libhelper.so</asset>
+    <asset cpu="any" system="mac" type="entrypoint" target="$(SourcePath)">/YourAppFolder/libhelper.dylib</asset>
+    -->
+  </assets>
+</packageManifest>

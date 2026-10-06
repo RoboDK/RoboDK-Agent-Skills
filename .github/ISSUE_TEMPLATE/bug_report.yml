@@ -1,0 +1,85 @@
+name: Bug report
+description: A skill gave wrong instructions, a bundled script failed, or the agent did the wrong thing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this issue can cause **unexpected motion of a real robot**,
+        please stop and report it privately instead — see
+        [SECURITY.md](https://github.com/RoboDK/RoboDK-Agent-Skills/blob/main/SECURITY.md).
+
+  - type: dropdown
+    id: skill
+    attributes:
+      label: Which skill?
+      options:
+        - robodk-api
+        - robodk-addin
+        - robodk-shape-builder
+        - robodk-station-audit
+        - robodk-post-processor-builder
+        - robodk-driver-builder
+        - robodk-real-robot-control
+        - Not sure / more than one
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What the agent or script did, and what you expected instead.
+      placeholder: |
+        I asked the agent to ... It ... but I expected ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The prompt you gave the agent, or the exact command you ran.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: agent
+    attributes:
+      label: Agent and version
+      placeholder: "e.g. Claude Code 2.x"
+    validations:
+      required: true
+
+  - type: input
+    id: robodk-version
+    attributes:
+      label: RoboDK version
+      description: Help → About in RoboDK.
+      placeholder: "e.g. 5.9.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows, macOS, Linux]
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error output
+      description: Any traceback or error text, as text rather than a screenshot.
+      render: shell
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: This happened in simulation only — no real robot was connected.
+          required: true
